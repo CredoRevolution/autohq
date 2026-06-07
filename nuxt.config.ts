@@ -32,6 +32,11 @@ export default defineNuxtConfig({
     },
   },
 
+  runtimeConfig: {
+    webhookSecret: process.env.WEBHOOK_SECRET ?? '',
+    supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY ?? '',
+  },
+
   typescript: {
     strict: true,
   },
