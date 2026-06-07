@@ -1,0 +1,95 @@
+{
+  "name": "AutoHQ — Remotive Job Search",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 9 * * 1-5" }]
+        }
+      },
+      "id": "cron-rem",
+      "name": "Every weekday 9:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 300],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "url": "https://remotive.com/api/remote-jobs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "category", "value": "software-dev" },
+            { "name": "search", "value": "vue OR nuxt OR frontend" },
+            { "name": "limit", "value": "20" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-remotive",
+      "name": "Fetch Remotive",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, 300],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "jobs",
+        "options": {}
+      },
+      "id": "split-rem",
+      "name": "Split Jobs",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [680, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\n\nreturn {\n  title: item.title,\n  company: item.company_name,\n  url: item.url,\n  location: item.candidate_required_location || 'Worldwide',\n  remote: true,\n  status: 'new',\n  fit_score: null,\n  salary_min: null,\n  salary_max: null,\n  notes: `Source: Remotive | Tags: ${(item.tags || []).join(', ')}`\n};"
+      },
+      "id": "map-rem",
+      "name": "Map to AutoHQ format",
+      "type": "n8n-nodes-base.code",
+      "position": [900, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://credorevolution.space/api/webhook/jobs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-webhook-secret", "value": "autohq-webhook-2026" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "post-rem",
+      "name": "Send to AutoHQ",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1120, 300],
+      "typeVersion": 4.2
+    }
+  ],
+  "connections": {
+    "Every weekday 9:00": {
+      "main": [[{ "node": "Fetch Remotive", "type": "main", "index": 0 }]]
+    },
+    "Fetch Remotive": {
+      "main": [[{ "node": "Split Jobs", "type": "main", "index": 0 }]]
+    },
+    "Split Jobs": {
+      "main": [[{ "node": "Map to AutoHQ format", "type": "main", "index": 0 }]]
+    },
+    "Map to AutoHQ format": {
+      "main": [[{ "node": "Send to AutoHQ", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["autohq"]
+}

@@ -1,0 +1,97 @@
+{
+  "name": "AutoHQ — HH.ru Job Search",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 8 * * 1-5" }]
+        }
+      },
+      "id": "cron-hh",
+      "name": "Every weekday 8:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 300],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "url": "https://api.hh.ru/vacancies",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "text", "value": "Vue developer OR Nuxt developer OR Frontend developer" },
+            { "name": "schedule", "value": "remote" },
+            { "name": "per_page", "value": "20" },
+            { "name": "order_by", "value": "publication_time" },
+            { "name": "currency", "value": "USD" }
+          ]
+        },
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "id": "http-hh",
+      "name": "Fetch HH.ru",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, 300],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "options": {}
+      },
+      "id": "split-hh",
+      "name": "Split Items",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [680, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\nconst salary = item.salary;\nlet salaryMin = null;\nlet salaryMax = null;\nif (salary) {\n  salaryMin = salary.from || null;\n  salaryMax = salary.to || null;\n  // Convert RUB to USD roughly if needed\n  if (salary.currency === 'RUR') {\n    if (salaryMin) salaryMin = Math.round(salaryMin / 90);\n    if (salaryMax) salaryMax = Math.round(salaryMax / 90);\n  }\n}\n\nreturn {\n  title: item.name,\n  company: item.employer?.name || 'Unknown',\n  url: item.alternate_url,\n  location: item.area?.name || null,\n  remote: true,\n  status: 'new',\n  fit_score: null,\n  salary_min: salaryMin,\n  salary_max: salaryMax,\n  notes: `Source: HH.ru | ID: ${item.id}`\n};"
+      },
+      "id": "map-hh",
+      "name": "Map to AutoHQ format",
+      "type": "n8n-nodes-base.code",
+      "position": [900, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://credorevolution.space/api/webhook/jobs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-webhook-secret", "value": "autohq-webhook-2026" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": { "ignore404": false }
+      },
+      "id": "post-hh",
+      "name": "Send to AutoHQ",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1120, 300],
+      "typeVersion": 4.2
+    }
+  ],
+  "connections": {
+    "Every weekday 8:00": {
+      "main": [[{ "node": "Fetch HH.ru", "type": "main", "index": 0 }]]
+    },
+    "Fetch HH.ru": {
+      "main": [[{ "node": "Split Items", "type": "main", "index": 0 }]]
+    },
+    "Split Items": {
+      "main": [[{ "node": "Map to AutoHQ format", "type": "main", "index": 0 }]]
+    },
+    "Map to AutoHQ format": {
+      "main": [[{ "node": "Send to AutoHQ", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["autohq"]
+}
