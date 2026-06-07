@@ -2,12 +2,44 @@
 definePageMeta({ layout: 'default' })
 useHead({ title: 'Dashboard' })
 
-const stats = [
-  { label: 'Total Jobs', value: '0', icon: 'lucide:briefcase' },
-  { label: 'Applied', value: '0', icon: 'lucide:send' },
-  { label: 'Interviews', value: '0', icon: 'lucide:calendar' },
-  { label: 'Avg Fit Score', value: '—', icon: 'lucide:target' },
-]
+const supabase = useSupabaseClient()
+
+const { data: jobs } = await useAsyncData('dashboard-jobs', async () => {
+  const { data } = await supabase
+    .from('jobs')
+    .select('id, status, fit_score, created_at, title, company')
+    .order('created_at', { ascending: false })
+  return data ?? []
+})
+
+const stats = computed(() => {
+  const all = jobs.value ?? []
+  const applied = all.filter(j => ['applied', 'interviewing', 'offer'].includes(j.status))
+  const interviews = all.filter(j => j.status === 'interviewing')
+  const scored = all.filter(j => j.fit_score != null)
+  const avgFit = scored.length
+    ? Math.round(scored.reduce((s, j) => s + (j.fit_score ?? 0), 0) / scored.length)
+    : null
+
+  return [
+    { label: 'Total Jobs',    value: String(all.length),       icon: 'lucide:briefcase' },
+    { label: 'Applied',       value: String(applied.length),   icon: 'lucide:send' },
+    { label: 'Interviews',    value: String(interviews.length), icon: 'lucide:calendar' },
+    { label: 'Avg Fit Score', value: avgFit != null ? `${avgFit}%` : '—', icon: 'lucide:target' },
+  ]
+})
+
+const recent = computed(() => (jobs.value ?? []).slice(0, 5))
+
+const statusClass: Record<string, string> = {
+  new:          'bg-blue-500/10 text-blue-500',
+  reviewing:    'bg-yellow-500/10 text-yellow-500',
+  applied:      'bg-purple-500/10 text-purple-500',
+  interviewing: 'bg-orange-500/10 text-orange-500',
+  offer:        'bg-green-500/10 text-green-500',
+  rejected:     'bg-red-500/10 text-red-500',
+  archived:     'bg-gray-500/10 text-gray-400',
+}
 </script>
 
 <template>
@@ -29,12 +61,30 @@ const stats = [
 
     <div class="grid gap-4 lg:grid-cols-2">
       <div class="rounded-xl border bg-card p-4 space-y-3">
-        <h2 class="font-semibold text-sm">Recent Jobs</h2>
-        <p class="text-sm text-muted-foreground">
-          No jobs yet.
-          <NuxtLink href="/jobs" class="underline underline-offset-2">Browse & add jobs →</NuxtLink>
-        </p>
+        <div class="flex items-center justify-between">
+          <h2 class="font-semibold text-sm">Recent Jobs</h2>
+          <NuxtLink href="/jobs" class="text-xs text-muted-foreground underline underline-offset-2">View all</NuxtLink>
+        </div>
+        <div v-if="recent.length === 0" class="text-sm text-muted-foreground">
+          No jobs yet. <NuxtLink href="/jobs/new" class="underline underline-offset-2">Add one →</NuxtLink>
+        </div>
+        <div v-else class="space-y-2">
+          <div
+            v-for="job in recent"
+            :key="job.id"
+            class="flex items-center justify-between py-1"
+          >
+            <div>
+              <div class="text-sm font-medium leading-tight">{{ job.title }}</div>
+              <div class="text-xs text-muted-foreground">{{ job.company }}</div>
+            </div>
+            <span :class="['text-xs rounded-full px-2 py-0.5 font-medium', statusClass[job.status]]">
+              {{ job.status }}
+            </span>
+          </div>
+        </div>
       </div>
+
       <div class="rounded-xl border bg-card p-4 space-y-3">
         <h2 class="font-semibold text-sm">Automation Status</h2>
         <div class="space-y-2">

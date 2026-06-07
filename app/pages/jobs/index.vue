@@ -12,7 +12,7 @@ interface Job {
   id: string
   title: string
   company: string
-  location: string
+  location: string | null
   remote: boolean
   status: JobStatus
   fit_score: number | null
@@ -30,9 +30,33 @@ const statusConfig: Record<JobStatus, { label: string; class: string }> = {
   archived:     { label: 'Archived',   class: 'bg-gray-500/10 text-gray-400 border-gray-500/20' },
 }
 
+const supabase = useSupabaseClient()
 const search = ref('')
 const statusFilter = ref<string>('all')
 const jobs = ref<Job[]>([])
+const loading = ref(true)
+
+const filtered = computed(() => {
+  return jobs.value.filter(j => {
+    const matchSearch = !search.value
+      || j.title.toLowerCase().includes(search.value.toLowerCase())
+      || j.company.toLowerCase().includes(search.value.toLowerCase())
+    const matchStatus = statusFilter.value === 'all' || j.status === statusFilter.value
+    return matchSearch && matchStatus
+  })
+})
+
+async function fetchJobs() {
+  loading.value = true
+  const { data } = await supabase
+    .from('jobs')
+    .select('id, title, company, location, remote, status, fit_score, created_at, url')
+    .order('created_at', { ascending: false })
+  jobs.value = (data as Job[]) ?? []
+  loading.value = false
+}
+
+onMounted(fetchJobs)
 </script>
 
 <template>
@@ -65,11 +89,17 @@ const jobs = ref<Job[]>([])
       </Select>
     </div>
 
-    <div v-if="jobs.length === 0" class="rounded-xl border border-dashed bg-card p-12 text-center">
+    <div v-if="loading" class="space-y-2">
+      <div v-for="i in 3" :key="i" class="h-14 rounded-xl border bg-muted/20 animate-pulse" />
+    </div>
+
+    <div v-else-if="filtered.length === 0" class="rounded-xl border border-dashed bg-card p-12 text-center">
       <Icon name="lucide:briefcase" class="size-10 text-muted-foreground mx-auto mb-3" />
-      <p class="font-medium">No jobs yet</p>
-      <p class="text-sm text-muted-foreground mt-1 mb-4">Add your first job manually or connect n8n to auto-import.</p>
-      <Button size="sm" as-child>
+      <p class="font-medium">{{ jobs.length === 0 ? 'No jobs yet' : 'No matches' }}</p>
+      <p class="text-sm text-muted-foreground mt-1 mb-4">
+        {{ jobs.length === 0 ? 'Add your first job manually or connect n8n to auto-import.' : 'Try adjusting your filters.' }}
+      </p>
+      <Button v-if="jobs.length === 0" size="sm" as-child>
         <NuxtLink href="/jobs/new">Add job</NuxtLink>
       </Button>
     </div>
@@ -79,31 +109,40 @@ const jobs = ref<Job[]>([])
         <thead class="border-b bg-muted/30">
           <tr>
             <th class="text-left px-4 py-3 font-medium text-muted-foreground">Position</th>
-            <th class="text-left px-4 py-3 font-medium text-muted-foreground">Location</th>
+            <th class="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Location</th>
             <th class="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-            <th class="text-left px-4 py-3 font-medium text-muted-foreground">Fit</th>
-            <th class="text-left px-4 py-3 font-medium text-muted-foreground">Added</th>
+            <th class="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Fit</th>
+            <th class="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Added</th>
             <th class="px-4 py-3" />
           </tr>
         </thead>
         <tbody>
-          <tr v-for="job in jobs" :key="job.id" class="border-b last:border-0 hover:bg-muted/20 transition-colors">
+          <tr
+            v-for="job in filtered"
+            :key="job.id"
+            class="border-b last:border-0 hover:bg-muted/20 transition-colors cursor-pointer"
+            @click="navigateTo(`/jobs/${job.id}`)"
+          >
             <td class="px-4 py-3">
               <div class="font-medium">{{ job.title }}</div>
               <div class="text-muted-foreground text-xs">{{ job.company }}</div>
             </td>
-            <td class="px-4 py-3 text-muted-foreground">{{ job.remote ? '🌍 Remote' : job.location }}</td>
+            <td class="px-4 py-3 text-muted-foreground hidden md:table-cell">
+              {{ job.remote ? '🌍 Remote' : (job.location ?? '—') }}
+            </td>
             <td class="px-4 py-3">
               <span :class="['inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium', statusConfig[job.status].class]">
                 {{ statusConfig[job.status].label }}
               </span>
             </td>
-            <td class="px-4 py-3">
+            <td class="px-4 py-3 hidden sm:table-cell">
               <span v-if="job.fit_score" class="font-medium">{{ job.fit_score }}%</span>
               <span v-else class="text-muted-foreground">—</span>
             </td>
-            <td class="px-4 py-3 text-muted-foreground text-xs">{{ new Date(job.created_at).toLocaleDateString() }}</td>
-            <td class="px-4 py-3">
+            <td class="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell">
+              {{ new Date(job.created_at).toLocaleDateString() }}
+            </td>
+            <td class="px-4 py-3" @click.stop>
               <Button variant="ghost" size="sm" as-child>
                 <NuxtLink :href="`/jobs/${job.id}`">View</NuxtLink>
               </Button>
