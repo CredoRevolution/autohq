@@ -3,10 +3,10 @@ definePageMeta({ layout: 'default' })
 useHead({ title: 'Dashboard' })
 
 const stats = [
-  { label: 'Total Jobs', value: '0', icon: 'i-lucide-briefcase' },
-  { label: 'Applied', value: '0', icon: 'i-lucide-send' },
-  { label: 'Interviews', value: '0', icon: 'i-lucide-calendar' },
-  { label: 'Avg Fit Score', value: '—', icon: 'i-lucide-target' },
+  { label: 'Total Jobs', value: '0', icon: 'lucide:briefcase' },
+  { label: 'Applied', value: '0', icon: 'lucide:send' },
+  { label: 'Interviews', value: '0', icon: 'lucide:calendar' },
+  { label: 'Avg Fit Score', value: '—', icon: 'lucide:target' },
 ]
 </script>
 
@@ -18,14 +18,10 @@ const stats = [
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <div
-        v-for="stat in stats"
-        :key="stat.label"
-        class="rounded-xl border bg-card p-4 flex flex-col gap-2"
-      >
+      <div v-for="stat in stats" :key="stat.label" class="rounded-xl border bg-card p-4 flex flex-col gap-2">
         <div class="flex items-center justify-between">
           <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ stat.label }}</span>
-          <span :class="[stat.icon, 'size-4 text-muted-foreground']" />
+          <Icon :name="stat.icon" class="size-4 text-muted-foreground" />
         </div>
         <span class="text-3xl font-bold">{{ stat.value }}</span>
       </div>

@@ -43,8 +43,6 @@ export interface Database {
           source?: string | null
           notes?: string | null
           applied_at?: string | null
-          created_at?: string
-          updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['jobs']['Insert']>
       }
@@ -66,9 +64,7 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['profile']['Row'], 'id' | 'created_at' | 'updated_at'> & {
-          id?: string
-        }
+        Insert: Omit<Database['public']['Tables']['profile']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
         Update: Partial<Database['public']['Tables']['profile']['Insert']>
       }
     }

@@ -9,7 +9,7 @@ export default defineNuxtConfig({
     '@vueuse/nuxt',
     '@pinia/nuxt',
     '@nuxtjs/supabase',
-    'nuxt-icon',
+    '@nuxt/icon',
   ],
 
   vite: {
@@ -28,15 +28,11 @@ export default defineNuxtConfig({
     redirectOptions: {
       login: '/login',
       callback: '/confirm',
-      exclude: ['/', '/jobs', '/jobs/**'],
+      exclude: ['/', '/jobs', '/jobs/**', '/applications', '/profile', '/automations', '/settings'],
     },
   },
 
   typescript: {
     strict: true,
-  },
-
-  imports: {
-    dirs: ['stores', 'composables', 'utils'],
   },
 })
