@@ -1,9 +1,10 @@
+import tailwindcss from '@tailwindcss/vite'
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
 
   modules: [
-    '@nuxtjs/tailwindcss',
     '@nuxtjs/color-mode',
     '@vueuse/nuxt',
     '@pinia/nuxt',
@@ -11,10 +12,11 @@ export default defineNuxtConfig({
     'nuxt-icon',
   ],
 
-  tailwindcss: {
-    cssPath: '~/assets/css/tailwind.css',
-    configPath: 'tailwind.config.ts',
+  vite: {
+    plugins: [tailwindcss()],
   },
+
+  css: ['~/assets/css/tailwind.css'],
 
   colorMode: {
     classSuffix: '',
@@ -26,11 +28,9 @@ export default defineNuxtConfig({
     redirectOptions: {
       login: '/login',
       callback: '/confirm',
-      exclude: ['/'],
+      exclude: ['/', '/jobs', '/jobs/**'],
     },
   },
-
-  css: ['~/assets/css/tailwind.css'],
 
   typescript: {
     strict: true,

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import {
@@ -39,22 +38,17 @@ const statusConfig: Record<JobStatus, { label: string; class: string }> = {
 
 const search = ref('')
 const statusFilter = ref<string>('all')
-
 const jobs = ref<Job[]>([])
 </script>
 
 <template>
-  <template #header>
-    <span class="text-sm font-medium">Jobs</span>
-  </template>
-
   <div class="space-y-4">
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-bold tracking-tight">Job Tracker</h1>
         <p class="text-muted-foreground text-sm mt-0.5">{{ jobs.length }} jobs tracked</p>
       </div>
-      <Button as-child size="sm">
+      <Button size="sm" as-child>
         <NuxtLink href="/jobs/new">
           <span class="i-lucide-plus size-4 mr-1" />
           Add Job
@@ -82,7 +76,7 @@ const jobs = ref<Job[]>([])
     </div>
 
     <div v-if="jobs.length === 0" class="rounded-xl border border-dashed bg-card p-12 text-center">
-      <span class="i-lucide-briefcase size-10 text-muted-foreground mx-auto block mb-3" />
+      <div class="i-lucide-briefcase size-10 text-muted-foreground mx-auto mb-3" />
       <p class="font-medium">No jobs yet</p>
       <p class="text-sm text-muted-foreground mt-1 mb-4">Add your first job manually or connect n8n to auto-import.</p>
       <Button size="sm" as-child>
@@ -116,9 +110,7 @@ const jobs = ref<Job[]>([])
               {{ job.remote ? '🌍 Remote' : job.location }}
             </td>
             <td class="px-4 py-3">
-              <span
-                :class="['inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium', statusConfig[job.status].class]"
-              >
+              <span :class="['inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium', statusConfig[job.status].class]">
                 {{ statusConfig[job.status].label }}
               </span>
             </td>

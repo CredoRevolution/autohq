@@ -3,18 +3,14 @@ definePageMeta({ layout: 'default' })
 useHead({ title: 'Dashboard' })
 
 const stats = [
-  { label: 'Total Jobs', value: '0', icon: 'i-lucide-briefcase', delta: '' },
-  { label: 'Applied', value: '0', icon: 'i-lucide-send', delta: '' },
-  { label: 'Interviews', value: '0', icon: 'i-lucide-calendar', delta: '' },
-  { label: 'Avg Fit Score', value: '—', icon: 'i-lucide-target', delta: '' },
+  { label: 'Total Jobs', value: '0', icon: 'i-lucide-briefcase' },
+  { label: 'Applied', value: '0', icon: 'i-lucide-send' },
+  { label: 'Interviews', value: '0', icon: 'i-lucide-calendar' },
+  { label: 'Avg Fit Score', value: '—', icon: 'i-lucide-target' },
 ]
 </script>
 
 <template>
-  <template #header>
-    <span class="text-sm font-medium">Dashboard</span>
-  </template>
-
   <div class="space-y-6">
     <div>
       <h1 class="text-2xl font-bold tracking-tight">Good morning 👋</h1>
@@ -38,17 +34,22 @@ const stats = [
     <div class="grid gap-4 lg:grid-cols-2">
       <div class="rounded-xl border bg-card p-4 space-y-3">
         <h2 class="font-semibold text-sm">Recent Jobs</h2>
-        <p class="text-sm text-muted-foreground">No jobs yet. <NuxtLink href="/jobs" class="underline underline-offset-2">Browse & add jobs →</NuxtLink></p>
+        <p class="text-sm text-muted-foreground">
+          No jobs yet.
+          <NuxtLink href="/jobs" class="underline underline-offset-2">Browse & add jobs →</NuxtLink>
+        </p>
       </div>
       <div class="rounded-xl border bg-card p-4 space-y-3">
         <h2 class="font-semibold text-sm">Automation Status</h2>
-        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-          <span class="i-lucide-circle-dot size-3 text-yellow-500" />
-          n8n not connected yet
-        </div>
-        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-          <span class="i-lucide-circle-dot size-3 text-yellow-500" />
-          Telegram bot not configured
+        <div class="space-y-2">
+          <div class="flex items-center gap-2 text-sm text-muted-foreground">
+            <span class="size-2 rounded-full bg-yellow-500 shrink-0" />
+            n8n not connected yet
+          </div>
+          <div class="flex items-center gap-2 text-sm text-muted-foreground">
+            <span class="size-2 rounded-full bg-yellow-500 shrink-0" />
+            Telegram bot not configured
+          </div>
         </div>
       </div>
     </div>
