@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
 const DEFAULTS = {
-  keywords: 'vue OR nuxt OR typescript OR frontend',
+  // Plain space-separated terms; each n8n workflow adapts the syntax
+  // (HH -> " OR ", Djinni -> "+", Remotive -> as-is).
+  keywords: 'vue nuxt typescript frontend',
   telegram_min_score: 70,
 }
 

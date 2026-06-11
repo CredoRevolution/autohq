@@ -143,11 +143,11 @@ onMounted(() => { loadConfig(); loadSources(); loadLastImport() })
           <textarea
             v-model="config.keywords"
             rows="2"
-            placeholder="vue OR nuxt OR typescript OR frontend"
+            placeholder="vue nuxt typescript frontend"
             class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 resize-none"
           />
           <p class="text-xs text-muted-foreground">
-            Синтаксис как в API источников: <code class="bg-muted px-1 rounded">vue OR nuxt</code>. n8n читает это поле при каждом прогоне.
+            Просто слова через пробел — <code class="bg-muted px-1 rounded">vue nuxt typescript</code>. n8n читает это при каждом прогоне и сам подставляет нужный синтаксис под каждый источник (Remotive, оба HH.ru, Djinni). Arbeitnow и Habr ищут по своим тегам.
           </p>
         </div>
 
