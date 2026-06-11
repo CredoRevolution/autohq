@@ -61,7 +61,7 @@ async function save() {
       <h1 class="text-2xl font-bold tracking-tight">Add Job</h1>
     </div>
 
-    <div class="rounded-xl border bg-card p-6 space-y-4">
+    <div class="surface p-6 space-y-4">
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="space-y-1.5">
           <label class="text-sm font-medium">Job Title <span class="text-destructive">*</span></label>

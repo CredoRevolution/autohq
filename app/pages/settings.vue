@@ -26,7 +26,7 @@ function saveSettings() {
       <p class="text-muted-foreground text-sm mt-1">Настройки поиска и интеграций.</p>
     </div>
 
-    <div class="rounded-xl border bg-card p-6 space-y-4">
+    <div class="surface p-6 space-y-4">
       <p class="text-sm font-semibold">Поисковые запросы</p>
       <p class="text-xs text-muted-foreground">Ключевые слова для n8n workflows. Меняй их прямо в n8n.</p>
 
@@ -37,7 +37,7 @@ function saveSettings() {
       </div>
     </div>
 
-    <div class="rounded-xl border bg-card p-6 space-y-4">
+    <div class="surface p-6 space-y-4">
       <p class="text-sm font-semibold">Webhook</p>
 
       <div class="space-y-3">
@@ -81,7 +81,7 @@ x-webhook-secret: {{ webhookSecret }}
       </div>
     </div>
 
-    <div class="rounded-xl border bg-card p-6 space-y-4">
+    <div class="surface p-6 space-y-4">
       <p class="text-sm font-semibold">Интеграции</p>
       <div class="space-y-3">
         <div class="flex items-center justify-between">

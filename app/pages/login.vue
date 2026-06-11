@@ -26,7 +26,7 @@ const features = [
   { icon: 'lucide:refresh-cw',   label: '5 Sources',       desc: 'Remotive, Djinni, Habr, Arbeitnow, HH.ru' },
 ]
 
-const stack = ['Nuxt 3', 'Supabase', 'n8n', 'OpenAI', 'Vercel']
+const stack = ['Nuxt 4', 'Supabase', 'n8n', 'OpenAI', 'Vercel']
 </script>
 
 <template>
@@ -34,14 +34,14 @@ const stack = ['Nuxt 3', 'Supabase', 'n8n', 'OpenAI', 'Vercel']
 
     <!-- Subtle radial glow -->
     <div class="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
-      <div class="absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 size-[600px] rounded-full bg-blue-500/5 blur-3xl" />
+      <div class="absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 size-[600px] rounded-full bg-primary/10 blur-3xl" />
     </div>
 
     <div class="relative w-full max-w-sm space-y-8">
 
       <!-- Logo + tagline -->
       <div class="text-center space-y-3">
-        <div class="inline-flex items-center justify-center size-12 rounded-xl bg-primary text-primary-foreground mx-auto">
+        <div class="inline-flex items-center justify-center size-12 rounded-xl bg-primary text-primary-foreground mx-auto accent-glow">
           <Icon name="lucide:zap" class="size-6" />
         </div>
         <div>

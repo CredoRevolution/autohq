@@ -45,7 +45,7 @@ const route = useRoute()
         <SidebarMenuItem>
           <SidebarMenuButton size="lg" as-child>
             <NuxtLink href="/">
-              <div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground accent-glow">
                 <Icon name="lucide:zap" class="size-4" />
               </div>
               <div class="grid flex-1 text-left text-sm leading-tight">

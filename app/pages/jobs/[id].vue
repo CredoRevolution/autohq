@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { JOB_STATUS, PIPELINE, scoreColor, type JobStatus } from '~/composables/useJobStatus'
 
 definePageMeta({ layout: 'default' })
 
@@ -12,19 +13,7 @@ const deleting = ref(false)
 const statusSaving = ref(false)
 const error = ref('')
 
-type JobStatus = 'new' | 'reviewing' | 'applied' | 'interviewing' | 'offer' | 'rejected' | 'archived'
-
-const STATUS_PIPELINE: JobStatus[] = ['new', 'reviewing', 'applied', 'interviewing', 'offer', 'rejected']
-
-const statusConfig: Record<JobStatus, { label: string; idle: string; active: string }> = {
-  new:          { label: 'New',       idle: 'border-border text-muted-foreground',          active: 'bg-blue-500/15 border-blue-500 text-blue-400' },
-  reviewing:    { label: 'Reviewing', idle: 'border-border text-muted-foreground',          active: 'bg-yellow-500/15 border-yellow-500 text-yellow-400' },
-  applied:      { label: 'Applied',   idle: 'border-border text-muted-foreground',          active: 'bg-purple-500/15 border-purple-500 text-purple-400' },
-  interviewing: { label: 'Interview', idle: 'border-border text-muted-foreground',          active: 'bg-orange-500/15 border-orange-500 text-orange-400' },
-  offer:        { label: 'Offer',     idle: 'border-border text-muted-foreground',          active: 'bg-green-500/15 border-green-500 text-green-400' },
-  rejected:     { label: 'Rejected',  idle: 'border-border text-muted-foreground',          active: 'bg-red-500/15 border-red-500 text-red-400' },
-  archived:     { label: 'Archived',  idle: 'border-border text-muted-foreground',          active: 'bg-gray-500/15 border-gray-500 text-gray-400' },
-}
+const STATUS_PIPELINE = PIPELINE
 
 const { data: job, refresh } = await useAsyncData(`job-${route.params.id}`, async () => {
   const { data } = await supabase.from('jobs').select('*').eq('id', route.params.id).single()
@@ -48,13 +37,7 @@ const form = reactive({
   notes: job.value.notes ?? '',
 })
 
-const scoreClass = computed(() => {
-  const s = job.value?.fit_score
-  if (!s) return 'text-muted-foreground'
-  if (s >= 70) return 'text-green-400'
-  if (s >= 40) return 'text-yellow-400'
-  return 'text-red-400'
-})
+const scoreClass = computed(() => scoreColor(job.value?.fit_score))
 
 const copied = ref(false)
 async function copyCoverLetter() {
@@ -127,7 +110,7 @@ async function deleteJob() {
     </div>
 
     <!-- Status pipeline — one click saves -->
-    <div class="rounded-xl border bg-card p-4">
+    <div class="surface p-4">
       <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Status</p>
       <div class="flex flex-wrap gap-2" :class="{ 'opacity-50 pointer-events-none': statusSaving }">
         <button
@@ -135,11 +118,12 @@ async function deleteJob() {
           :key="s"
           @click="quickSetStatus(s)"
           :class="[
-            'px-3 py-1.5 rounded-full border text-xs font-medium transition-all',
-            form.status === s ? statusConfig[s].active : statusConfig[s].idle + ' hover:border-foreground/30 hover:text-foreground'
+            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all',
+            form.status === s ? JOB_STATUS[s].chip : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground'
           ]"
         >
-          {{ statusConfig[s].label }}
+          <span :class="['size-1.5 rounded-full', form.status === s ? JOB_STATUS[s].dot : 'bg-current opacity-40']" />
+          {{ JOB_STATUS[s].label }}
         </button>
         <Icon v-if="statusSaving" name="lucide:loader-circle" class="size-4 animate-spin text-muted-foreground self-center ml-1" />
       </div>
@@ -149,7 +133,7 @@ async function deleteJob() {
     </div>
 
     <!-- Cover letter -->
-    <div v-if="job?.cover_letter" class="rounded-xl border bg-card p-5 space-y-3">
+    <div v-if="job?.cover_letter" class="surface p-5 space-y-3">
       <div class="flex items-center justify-between">
         <h2 class="text-sm font-semibold">Cover Letter</h2>
         <Button variant="outline" size="sm" @click="copyCoverLetter">
@@ -161,13 +145,13 @@ async function deleteJob() {
     </div>
 
     <!-- AI score reason -->
-    <div v-if="job?.score_reason" class="rounded-xl border bg-card px-4 py-3 text-sm">
+    <div v-if="job?.score_reason" class="surface px-4 py-3 text-sm">
       <span class="font-medium">AI: </span>
       <span class="text-muted-foreground">{{ job.score_reason }}</span>
     </div>
 
     <!-- Edit form -->
-    <div class="rounded-xl border bg-card p-6 space-y-4">
+    <div class="surface p-6 space-y-4">
       <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Details</p>
 
       <div class="grid gap-4 sm:grid-cols-2">

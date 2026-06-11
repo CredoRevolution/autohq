@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { JOB_STATUS, PIPELINE, BOARD_COLUMNS, scoreColor, type JobStatus } from '~/composables/useJobStatus'
 
 definePageMeta({ layout: 'default' })
 useHead({ title: 'Jobs' })
-
-type JobStatus = 'new' | 'reviewing' | 'applied' | 'interviewing' | 'offer' | 'rejected' | 'archived'
 
 interface Job {
   id: string
@@ -16,65 +15,87 @@ interface Job {
   status: JobStatus
   fit_score: number | null
   created_at: string
+  applied_at: string | null
   url: string | null
 }
 
-const statusConfig: Record<JobStatus, { label: string; badge: string; chip: string }> = {
-  new:          { label: 'New',       badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20',     chip: 'bg-blue-500/15 border-blue-500 text-blue-400' },
-  reviewing:    { label: 'Reviewing', badge: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20', chip: 'bg-yellow-500/15 border-yellow-500 text-yellow-400' },
-  applied:      { label: 'Applied',   badge: 'bg-purple-500/10 text-purple-400 border-purple-500/20', chip: 'bg-purple-500/15 border-purple-500 text-purple-400' },
-  interviewing: { label: 'Interview', badge: 'bg-orange-500/10 text-orange-400 border-orange-500/20', chip: 'bg-orange-500/15 border-orange-500 text-orange-400' },
-  offer:        { label: 'Offer',     badge: 'bg-green-500/10 text-green-400 border-green-500/20',   chip: 'bg-green-500/15 border-green-500 text-green-400' },
-  rejected:     { label: 'Rejected',  badge: 'bg-red-500/10 text-red-400 border-red-500/20',         chip: 'bg-red-500/15 border-red-500 text-red-400' },
-  archived:     { label: 'Archived',  badge: 'bg-gray-500/10 text-gray-400 border-gray-500/20',      chip: 'bg-gray-500/15 border-gray-500 text-gray-400' },
-}
-
-const PIPELINE_STATUSES: JobStatus[] = ['new', 'applied', 'interviewing', 'offer']
-
-function scoreClass(score: number | null) {
-  if (!score) return 'text-muted-foreground'
-  if (score >= 70) return 'text-green-400 font-semibold'
-  if (score >= 40) return 'text-yellow-400'
-  return 'text-red-400/70'
-}
-
 const supabase = useSupabaseClient()
+const view = useStorage<'board' | 'table'>('autohq:jobs-view', 'board')
 const search = ref('')
-const statusFilter = ref('all')
+const statusFilter = ref<'all' | JobStatus>('all')
 const sortBy = ref<'score' | 'date'>('score')
 const jobs = ref<Job[]>([])
 const loading = ref(true)
 
 const counts = computed(() => {
-  const all = jobs.value
-  const result: Record<string, number> = { all: all.length }
-  for (const key of Object.keys(statusConfig) as JobStatus[]) {
-    result[key] = all.filter(j => j.status === key).length
-  }
+  const result: Record<string, number> = { all: jobs.value.length }
+  for (const key of PIPELINE) result[key] = jobs.value.filter(j => j.status === key).length
+  result.archived = jobs.value.filter(j => j.status === 'archived').length
   return result
 })
 
 const filtered = computed(() => {
+  const q = search.value.toLowerCase()
   let list = jobs.value.filter(j => {
-    const q = search.value.toLowerCase()
     const matchSearch = !q || j.title.toLowerCase().includes(q) || j.company.toLowerCase().includes(q)
     const matchStatus = statusFilter.value === 'all' || j.status === statusFilter.value
     return matchSearch && matchStatus
   })
-  if (sortBy.value === 'score') {
-    list = [...list].sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1))
-  }
+  if (sortBy.value === 'score') list = [...list].sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1))
   return list
+})
+
+/** jobs grouped per board column, honoring the search box */
+const board = computed(() => {
+  const q = search.value.toLowerCase()
+  const visible = jobs.value.filter(j => !q || j.title.toLowerCase().includes(q) || j.company.toLowerCase().includes(q))
+  return BOARD_COLUMNS.map(status => ({
+    status,
+    ...JOB_STATUS[status],
+    items: visible
+      .filter(j => j.status === status)
+      .sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1)),
+  }))
 })
 
 async function fetchJobs() {
   loading.value = true
   const { data } = await supabase
     .from('jobs')
-    .select('id, title, company, location, remote, status, fit_score, created_at, url')
+    .select('id, title, company, location, remote, status, fit_score, created_at, applied_at, url')
     .order('created_at', { ascending: false })
   jobs.value = (data as Job[]) ?? []
   loading.value = false
+}
+
+// ── Drag & drop ──────────────────────────────
+const draggingId = ref<string | null>(null)
+const dragOverCol = ref<JobStatus | null>(null)
+
+function onDragStart(job: Job) {
+  draggingId.value = job.id
+}
+function onDragEnd() {
+  draggingId.value = null
+  dragOverCol.value = null
+}
+async function onDrop(status: JobStatus) {
+  const id = draggingId.value
+  dragOverCol.value = null
+  draggingId.value = null
+  if (!id) return
+  const job = jobs.value.find(j => j.id === id)
+  if (!job || job.status === status) return
+
+  const prev = job.status
+  job.status = status // optimistic
+  const patch: Record<string, unknown> = { status }
+  if (status === 'applied' && !job.applied_at) {
+    job.applied_at = new Date().toISOString()
+    patch.applied_at = job.applied_at
+  }
+  const { error } = await supabase.from('jobs').update(patch).eq('id', id)
+  if (error) job.status = prev // rollback
 }
 
 onMounted(fetchJobs)
@@ -83,103 +104,170 @@ onMounted(fetchJobs)
 <template>
   <div class="space-y-4">
 
-    <div class="flex items-center justify-between">
+    <!-- Header -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="text-2xl font-bold tracking-tight">Job Tracker</h1>
         <p class="text-muted-foreground text-sm mt-0.5">{{ jobs.length }} jobs tracked</p>
       </div>
+      <div class="flex items-center gap-2">
+        <!-- View toggle -->
+        <div class="inline-flex rounded-lg border bg-card p-0.5">
+          <button
+            v-for="v in (['board','table'] as const)"
+            :key="v"
+            @click="view = v"
+            :class="[
+              'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+              view === v ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            ]"
+          >
+            <Icon :name="v === 'board' ? 'lucide:kanban' : 'lucide:table-2'" class="size-3.5" />
+            {{ v === 'board' ? 'Board' : 'Table' }}
+          </button>
+        </div>
+        <Button size="sm" as-child>
+          <NuxtLink href="/jobs/new">
+            <Icon name="lucide:plus" class="size-4 mr-1" />
+            Add Job
+          </NuxtLink>
+        </Button>
+      </div>
+    </div>
+
+    <!-- Search + (table-only) filters -->
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="relative flex-1 min-w-[200px] max-w-xs">
+        <Icon name="lucide:search" class="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <Input v-model="search" placeholder="Search title or company…" class="pl-8" />
+      </div>
+
+      <template v-if="view === 'table'">
+        <button
+          @click="statusFilter = 'all'"
+          :class="['px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
+            statusFilter === 'all' ? 'bg-foreground text-background border-foreground' : 'border-border text-muted-foreground hover:text-foreground']"
+        >
+          All <span class="ml-1 tabular-nums opacity-70">{{ counts.all }}</span>
+        </button>
+        <button
+          v-for="s in PIPELINE"
+          :key="s"
+          @click="statusFilter = statusFilter === s ? 'all' : s"
+          :class="['px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
+            statusFilter === s ? JOB_STATUS[s].chip : 'border-border text-muted-foreground hover:text-foreground']"
+        >
+          {{ JOB_STATUS[s].label }} <span class="ml-1 tabular-nums opacity-70">{{ counts[s] }}</span>
+        </button>
+        <button
+          @click="sortBy = sortBy === 'score' ? 'date' : 'score'"
+          class="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap"
+        >
+          <Icon :name="sortBy === 'score' ? 'lucide:target' : 'lucide:clock'" class="size-3.5" />
+          {{ sortBy === 'score' ? 'By score' : 'By date' }}
+        </button>
+      </template>
+    </div>
+
+    <!-- Loading -->
+    <div v-if="loading" class="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div v-for="i in 5" :key="i" class="h-40 rounded-xl border bg-muted/20 animate-pulse" />
+    </div>
+
+    <!-- Empty -->
+    <div v-else-if="jobs.length === 0" class="surface border-dashed p-12 text-center">
+      <div class="mx-auto mb-3 flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <Icon name="lucide:briefcase" class="size-6" />
+      </div>
+      <p class="font-medium">No jobs yet</p>
+      <p class="text-sm text-muted-foreground mt-1 mb-4">n8n will auto-import jobs every morning. Or add one manually.</p>
       <Button size="sm" as-child>
-        <NuxtLink href="/jobs/new">
-          <Icon name="lucide:plus" class="size-4 mr-1" />
-          Add Job
-        </NuxtLink>
+        <NuxtLink href="/jobs/new">Add your first job</NuxtLink>
       </Button>
     </div>
 
-    <!-- Pipeline filter chips -->
-    <div class="flex flex-wrap gap-2">
-      <button
-        @click="statusFilter = 'all'"
-        :class="[
-          'px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
-          statusFilter === 'all'
-            ? 'bg-foreground text-background border-foreground'
-            : 'border-border text-muted-foreground hover:text-foreground'
-        ]"
-      >
-        All <span class="ml-1 tabular-nums opacity-70">{{ counts.all }}</span>
-      </button>
-      <button
-        v-for="s in PIPELINE_STATUSES"
-        :key="s"
-        @click="statusFilter = statusFilter === s ? 'all' : s"
-        :class="[
-          'px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors',
-          statusFilter === s ? statusConfig[s].chip : 'border-border text-muted-foreground hover:text-foreground'
-        ]"
-      >
-        {{ statusConfig[s].label }} <span class="ml-1 tabular-nums opacity-70">{{ counts[s] }}</span>
-      </button>
-      <!-- Rejected/Archived as smaller chip -->
-      <button
-        v-for="s in (['rejected', 'archived'] as JobStatus[])"
-        :key="s"
-        @click="statusFilter = statusFilter === s ? 'all' : s"
-        :class="[
-          'px-2.5 py-1.5 rounded-lg border text-xs transition-colors',
-          statusFilter === s ? statusConfig[s].chip : 'border-border text-muted-foreground/60 hover:text-muted-foreground'
-        ]"
-      >
-        {{ statusConfig[s].label }} {{ counts[s] }}
-      </button>
+    <!-- ── BOARD VIEW ─────────────────────────── -->
+    <div v-else-if="view === 'board'" class="-mx-1 overflow-x-auto pb-2">
+      <div class="flex gap-3 px-1 min-w-max">
+        <div
+          v-for="col in board"
+          :key="col.status"
+          class="flex w-72 shrink-0 flex-col rounded-xl border bg-card/40 transition-colors"
+          :class="dragOverCol === col.status ? 'border-primary/60 bg-primary/5' : 'border-border'"
+          @dragover.prevent="dragOverCol = col.status"
+          @dragleave="dragOverCol === col.status && (dragOverCol = null)"
+          @drop="onDrop(col.status)"
+        >
+          <!-- Column header -->
+          <div class="flex items-center justify-between px-3 py-2.5 border-b">
+            <span class="flex items-center gap-2 text-sm font-medium">
+              <span :class="['size-2 rounded-full', col.dot]" />
+              {{ col.label }}
+            </span>
+            <span class="text-xs font-semibold tabular-nums text-muted-foreground bg-muted/60 rounded-full px-2 py-0.5">
+              {{ col.items.length }}
+            </span>
+          </div>
+
+          <!-- Cards -->
+          <div class="flex-1 space-y-2 p-2 min-h-24">
+            <div
+              v-for="job in col.items"
+              :key="job.id"
+              draggable="true"
+              @dragstart="onDragStart(job)"
+              @dragend="onDragEnd"
+              @click="navigateTo(`/jobs/${job.id}`)"
+              :class="['group cursor-grab active:cursor-grabbing rounded-lg border bg-card p-3 transition-all hover:border-primary/40',
+                draggingId === job.id ? 'opacity-40 ring-1 ring-primary' : '']"
+            >
+              <div class="flex items-start justify-between gap-2">
+                <p class="text-sm font-medium leading-tight line-clamp-2 group-hover:text-primary transition-colors">{{ job.title }}</p>
+                <span
+                  v-if="job.fit_score != null"
+                  :class="['shrink-0 text-xs font-bold tabular-nums rounded-md px-1.5 py-0.5 bg-muted/60', scoreColor(job.fit_score)]"
+                >{{ job.fit_score }}</span>
+              </div>
+              <p class="mt-1 text-xs text-muted-foreground truncate">{{ job.company }}</p>
+              <div class="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                <span class="flex items-center gap-1 truncate">
+                  <Icon :name="job.remote ? 'lucide:globe' : 'lucide:map-pin'" class="size-3 shrink-0" />
+                  {{ job.remote ? 'Remote' : (job.location || '—') }}
+                </span>
+              </div>
+            </div>
+
+            <p v-if="col.items.length === 0" class="text-center text-xs text-muted-foreground/60 py-6">
+              Drop here
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Search + sort -->
-    <div class="flex gap-2">
-      <Input v-model="search" placeholder="Search jobs..." class="max-w-xs" />
-      <button
-        @click="sortBy = sortBy === 'score' ? 'date' : 'score'"
-        :class="[
-          'flex items-center gap-1.5 px-3 rounded-md border text-xs font-medium transition-colors whitespace-nowrap',
-          sortBy === 'score' ? 'border-foreground/60 text-foreground' : 'border-border text-muted-foreground hover:text-foreground'
-        ]"
-      >
-        <Icon :name="sortBy === 'score' ? 'lucide:target' : 'lucide:clock'" class="size-3.5" />
-        {{ sortBy === 'score' ? 'By score' : 'By date' }}
-      </button>
+    <!-- ── TABLE VIEW ─────────────────────────── -->
+    <div v-else-if="filtered.length === 0" class="surface border-dashed p-12 text-center">
+      <Icon name="lucide:search-x" class="size-8 text-muted-foreground mx-auto mb-3" />
+      <p class="font-medium">No matches</p>
+      <p class="text-sm text-muted-foreground mt-1">Try adjusting your search or filters.</p>
     </div>
 
-    <div v-if="loading" class="space-y-2">
-      <div v-for="i in 4" :key="i" class="h-14 rounded-xl border bg-muted/20 animate-pulse" />
-    </div>
-
-    <div v-else-if="filtered.length === 0" class="rounded-xl border border-dashed bg-card p-12 text-center">
-      <Icon name="lucide:briefcase" class="size-10 text-muted-foreground mx-auto mb-3" />
-      <p class="font-medium">{{ jobs.length === 0 ? 'No jobs yet' : 'No matches' }}</p>
-      <p class="text-sm text-muted-foreground mt-1 mb-4">
-        {{ jobs.length === 0 ? 'n8n will auto-import jobs. Or add one manually.' : 'Try adjusting your filters.' }}
-      </p>
-      <Button v-if="jobs.length === 0" size="sm" as-child>
-        <NuxtLink href="/jobs/new">Add job</NuxtLink>
-      </Button>
-    </div>
-
-    <div v-else class="rounded-xl border overflow-hidden">
+    <div v-else class="surface overflow-hidden">
       <table class="w-full text-sm">
-        <thead class="border-b bg-muted/30">
+        <thead class="border-b bg-muted/30 text-xs uppercase tracking-wide">
           <tr>
-            <th class="text-left px-4 py-3 font-medium text-muted-foreground">Position</th>
-            <th class="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Location</th>
-            <th class="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-            <th class="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Fit</th>
-            <th class="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Added</th>
+            <th class="text-left px-4 py-2.5 font-medium text-muted-foreground">Position</th>
+            <th class="text-left px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">Location</th>
+            <th class="text-left px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+            <th class="text-left px-4 py-2.5 font-medium text-muted-foreground hidden sm:table-cell">Fit</th>
+            <th class="text-left px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">Added</th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="job in filtered"
             :key="job.id"
-            class="border-b last:border-0 hover:bg-muted/20 transition-colors cursor-pointer"
+            class="border-b last:border-0 hover:bg-accent/50 transition-colors cursor-pointer"
             @click="navigateTo(`/jobs/${job.id}`)"
           >
             <td class="px-4 py-3">
@@ -190,12 +278,13 @@ onMounted(fetchJobs)
               {{ job.remote ? '🌍 Remote' : (job.location ?? '—') }}
             </td>
             <td class="px-4 py-3">
-              <span :class="['inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium', statusConfig[job.status].badge]">
-                {{ statusConfig[job.status].label }}
+              <span :class="['inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium', JOB_STATUS[job.status].badge]">
+                <span :class="['size-1.5 rounded-full', JOB_STATUS[job.status].dot]" />
+                {{ JOB_STATUS[job.status].label }}
               </span>
             </td>
             <td class="px-4 py-3 hidden sm:table-cell">
-              <span :class="['tabular-nums text-sm', scoreClass(job.fit_score)]">
+              <span :class="['tabular-nums text-sm font-medium', scoreColor(job.fit_score)]">
                 {{ job.fit_score != null ? job.fit_score + '%' : '—' }}
               </span>
             </td>
@@ -206,6 +295,11 @@ onMounted(fetchJobs)
         </tbody>
       </table>
     </div>
+
+    <p v-if="view === 'board' && jobs.length" class="text-xs text-muted-foreground flex items-center gap-1.5">
+      <Icon name="lucide:move" class="size-3.5" />
+      Drag cards between columns to change status.
+    </p>
 
   </div>
 </template>

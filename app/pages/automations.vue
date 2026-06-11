@@ -62,7 +62,7 @@ onMounted(fetchSources)
       <p class="text-muted-foreground text-sm mt-1">n8n workflows автоматически ищут и добавляют вакансии.</p>
     </div>
 
-    <div class="rounded-xl border bg-card p-5 space-y-4">
+    <div class="surface p-5 space-y-4">
       <div class="flex items-center gap-2">
         <span class="size-2 rounded-full bg-green-500 shrink-0 animate-pulse" />
         <span class="font-medium text-sm">n8n работает</span>
@@ -96,7 +96,7 @@ onMounted(fetchSources)
         <div
           v-for="src in sources"
           :key="src.source_id"
-          class="rounded-xl border bg-card p-4"
+          class="surface p-4"
         >
           <div class="flex items-center gap-3 mb-3">
             <Icon
@@ -156,7 +156,7 @@ onMounted(fetchSources)
       </div>
     </div>
 
-    <div class="rounded-xl border bg-card p-5 space-y-3">
+    <div class="surface p-5 space-y-3">
       <p class="text-sm font-medium">Webhook endpoint</p>
       <p class="text-xs text-muted-foreground">n8n отправляет вакансии на этот URL:</p>
       <code class="block rounded-md bg-muted px-3 py-2 text-xs font-mono break-all">
