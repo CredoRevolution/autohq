@@ -61,6 +61,7 @@ export default defineEventHandler(async (event) => {
     description: body.description ? String(body.description) : null,
     cover_letter: body.cover_letter ? String(body.cover_letter) : null,
     score_reason: body.score_reason ? String(body.score_reason) : null,
+    source: body.source ? String(body.source) : null,
   }).select('id').single()
 
   if (error) {
@@ -71,7 +72,15 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, message: error.message })
   }
 
-  // Only send Telegram if score >= 70 (7/10) or no score yet
-  const scorePassed = fitScore === null || fitScore >= 70
+  // Telegram threshold is a live setting (app_config), default 70
+  let minScore = 70
+  const { data: cfg } = await supabase
+    .from('app_config')
+    .select('telegram_min_score')
+    .eq('id', 1)
+    .single()
+  if (cfg?.telegram_min_score != null) minScore = cfg.telegram_min_score
+
+  const scorePassed = fitScore === null || fitScore >= minScore
   return { ok: true, id: data.id, telegram_notify: telegramEnabled && scorePassed }
 })

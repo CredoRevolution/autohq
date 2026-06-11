@@ -156,6 +156,23 @@
   }
 }
 
+/* Print: show only the CV sheet, fit to paper */
+@media print {
+  body { background: #fff !important; }
+  body * { visibility: hidden !important; }
+  .cv-sheet, .cv-sheet * { visibility: visible !important; }
+  .cv-sheet {
+    position: absolute !important;
+    left: 0; top: 0;
+    width: 100% !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .no-print { display: none !important; }
+}
+
 /* Slim, modern scrollbars (dark-first) */
 * {
   scrollbar-width: thin;

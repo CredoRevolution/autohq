@@ -29,8 +29,7 @@ const nav = [
     label: 'Tools',
     items: [
       { title: 'Profile & CV', icon: 'lucide:user', href: '/profile' },
-      { title: 'Automations', icon: 'lucide:bot', href: '/automations' },
-      { title: 'Settings', icon: 'lucide:settings', href: '/settings' },
+      { title: 'Control', icon: 'lucide:sliders-horizontal', href: '/automations' },
     ],
   },
 ]

@@ -1,32 +1,93 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'default' })
-useHead({ title: 'Automations' })
+import { Button } from '~/components/ui/button'
 
+definePageMeta({ layout: 'default' })
+useHead({ title: 'Control' })
+
+const supabase = useSupabaseClient()
+
+// ── Live config (keywords + telegram threshold) ──
+interface AppConfig { keywords: string; telegram_min_score: number }
+const config = reactive<AppConfig>({ keywords: '', telegram_min_score: 70 })
+const cfgLoading = ref(true)
+const cfgSaving = ref(false)
+const cfgSaved = ref(false)
+const cfgError = ref('')
+
+async function loadConfig() {
+  try {
+    const data = await $fetch<AppConfig>('/api/config')
+    config.keywords = data.keywords
+    config.telegram_min_score = data.telegram_min_score
+  } finally {
+    cfgLoading.value = false
+  }
+}
+async function saveConfig() {
+  cfgSaving.value = true
+  cfgError.value = ''
+  cfgSaved.value = false
+  try {
+    await $fetch('/api/config', {
+      method: 'PATCH',
+      body: { keywords: config.keywords, telegram_min_score: config.telegram_min_score },
+    })
+    cfgSaved.value = true
+    setTimeout(() => { cfgSaved.value = false }, 2000)
+  } catch (e: any) {
+    cfgError.value = e?.data?.message ?? 'Не удалось сохранить'
+  } finally {
+    cfgSaving.value = false
+  }
+}
+
+// ── Sources (toggles + last import) ──
 interface SourceSetting {
   source_id: string
   label: string
   site_enabled: boolean
   telegram_enabled: boolean
 }
-
 const sources = ref<SourceSetting[]>([])
-const loading = ref(true)
+const srcLoading = ref(true)
 const saving = ref<Record<string, boolean>>({})
+const lastImport = ref<Record<string, string>>({})
 
-const sourceIcons: Record<string, { icon: string; color: string; description: string }> = {
-  hh:        { icon: 'lucide:building-2', color: 'text-red-500',   description: 'Вакансии из России и СНГ' },
-  remotive:  { icon: 'lucide:globe',      color: 'text-blue-500',  description: 'Международные remote вакансии' },
-  arbeitnow: { icon: 'lucide:laptop',     color: 'text-green-500', description: 'Remote-first вакансии по тегам' },
+const sourceMeta: Record<string, { icon: string; color: string; description: string }> = {
+  hh:        { icon: 'lucide:building-2', color: 'text-rose-400',    description: 'Россия и СНГ' },
+  remotive:  { icon: 'lucide:globe',      color: 'text-blue-400',    description: 'Международные remote' },
+  arbeitnow: { icon: 'lucide:laptop',     color: 'text-emerald-400', description: 'Remote-first по тегам' },
+  habr:      { icon: 'lucide:code',       color: 'text-sky-400',     description: 'Хабр Карьера' },
+  djinni:    { icon: 'lucide:briefcase',  color: 'text-violet-400',  description: 'Djinni — CIS/EU remote' },
 }
 
-async function fetchSources() {
-  loading.value = true
+async function loadSources() {
+  srcLoading.value = true
   try {
-    const data = await $fetch<SourceSetting[]>('/api/sources/settings')
-    sources.value = data
+    sources.value = await $fetch<SourceSetting[]>('/api/sources/settings')
   } finally {
-    loading.value = false
+    srcLoading.value = false
   }
+}
+async function loadLastImport() {
+  const { data } = await supabase
+    .from('jobs')
+    .select('source, created_at')
+    .not('source', 'is', null)
+    .order('created_at', { ascending: false })
+  const seen: Record<string, string> = {}
+  for (const row of (data ?? []) as { source: string; created_at: string }[]) {
+    if (row.source && !seen[row.source]) seen[row.source] = row.created_at
+  }
+  lastImport.value = seen
+}
+function relTime(iso?: string) {
+  if (!iso) return '—'
+  const diff = Date.now() - new Date(iso).getTime()
+  const h = Math.floor(diff / 3.6e6)
+  if (h < 1) return 'только что'
+  if (h < 24) return `${h} ч назад`
+  return `${Math.floor(h / 24)} дн назад`
 }
 
 async function toggle(src: SourceSetting, field: 'site_enabled' | 'telegram_enabled') {
@@ -34,135 +95,175 @@ async function toggle(src: SourceSetting, field: 'site_enabled' | 'telegram_enab
   saving.value[key] = true
   const newVal = !src[field]
   try {
-    await $fetch(`/api/sources/${src.source_id}`, {
-      method: 'PATCH',
-      body: { [field]: newVal },
-    })
+    await $fetch(`/api/sources/${src.source_id}`, { method: 'PATCH', body: { [field]: newVal } })
     src[field] = newVal
   } finally {
     saving.value[key] = false
   }
 }
 
-const steps = [
-  { label: 'n8n запускается по расписанию', icon: 'lucide:clock' },
-  { label: 'Запрашивает вакансии из источников', icon: 'lucide:search' },
-  { label: 'Фильтрует уже добавленные', icon: 'lucide:filter' },
-  { label: 'Отправляет новые в AutoHQ', icon: 'lucide:send' },
-  { label: 'Уведомляет в Telegram', icon: 'lucide:message-circle' },
+const integrations = [
+  { label: 'n8n', sub: 'n8n.credorevolution.space', href: 'https://n8n.credorevolution.space' },
+  { label: 'Telegram Bot', sub: '@myfirstgmailbot', href: 'https://t.me/myfirstgmailbot' },
+  { label: 'Supabase', sub: 'lbqzcsauuuqngsfyikcp.supabase.co', href: 'https://supabase.com/dashboard' },
 ]
 
-onMounted(fetchSources)
+const webhookOpen = ref(false)
+const copied = ref('')
+function copy(text: string, tag: string) {
+  navigator.clipboard.writeText(text)
+  copied.value = tag
+  setTimeout(() => { copied.value = '' }, 1500)
+}
+
+onMounted(() => { loadConfig(); loadSources(); loadLastImport() })
 </script>
 
 <template>
-  <div class="space-y-6 max-w-2xl">
+  <div class="space-y-6 max-w-3xl">
     <div>
-      <h1 class="text-2xl font-bold tracking-tight">Automations</h1>
-      <p class="text-muted-foreground text-sm mt-1">n8n workflows автоматически ищут и добавляют вакансии.</p>
+      <h1 class="text-2xl font-bold tracking-tight">Control</h1>
+      <p class="text-muted-foreground text-sm mt-1">Поиск, источники и интеграции пайплайна вакансий.</p>
     </div>
 
-    <div class="surface p-5 space-y-4">
+    <!-- Search & Alerts (the live levers) -->
+    <div class="surface p-6 space-y-5">
       <div class="flex items-center gap-2">
-        <span class="size-2 rounded-full bg-green-500 shrink-0 animate-pulse" />
-        <span class="font-medium text-sm">n8n работает</span>
-        <a href="https://n8n.credorevolution.space" target="_blank" rel="noopener" class="ml-auto text-xs text-muted-foreground underline underline-offset-2">
-          Открыть n8n →
-        </a>
+        <Icon name="lucide:sliders-horizontal" class="size-4 text-primary" />
+        <p class="text-sm font-semibold">Поиск и уведомления</p>
+        <span class="ml-auto inline-flex items-center gap-1 text-[11px] text-emerald-400">
+          <span class="size-1.5 rounded-full bg-emerald-400" /> live
+        </span>
       </div>
 
-      <div class="space-y-2">
-        <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Как это работает</p>
-        <div class="space-y-2">
-          <div v-for="(step, i) in steps" :key="i" class="flex items-center gap-3 text-sm">
-            <div class="size-6 rounded-full bg-muted flex items-center justify-center shrink-0 text-xs font-bold text-muted-foreground">
-              {{ i + 1 }}
-            </div>
-            <Icon :name="step.icon" class="size-4 text-muted-foreground shrink-0" />
-            <span>{{ step.label }}</span>
-          </div>
+      <div v-if="cfgLoading" class="h-24 rounded-lg bg-muted/30 animate-pulse" />
+      <template v-else>
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium">Поисковые ключевые слова</label>
+          <textarea
+            v-model="config.keywords"
+            rows="2"
+            placeholder="vue OR nuxt OR typescript OR frontend"
+            class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 resize-none"
+          />
+          <p class="text-xs text-muted-foreground">
+            Синтаксис как в API источников: <code class="bg-muted px-1 rounded">vue OR nuxt</code>. n8n читает это поле при каждом прогоне.
+          </p>
         </div>
-      </div>
+
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium flex items-center justify-between">
+            <span>Порог Telegram-уведомлений</span>
+            <span class="tabular-nums text-primary font-semibold">{{ config.telegram_min_score }}+</span>
+          </label>
+          <input
+            v-model.number="config.telegram_min_score"
+            type="range" min="0" max="100" step="5"
+            class="w-full accent-primary"
+          />
+          <p class="text-xs text-muted-foreground">В Telegram приходят только вакансии со score ≥ {{ config.telegram_min_score }}. Применяется сразу.</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <Button :disabled="cfgSaving" @click="saveConfig">
+            <Icon v-if="cfgSaving" name="lucide:loader-circle" class="size-4 mr-1.5 animate-spin" />
+            <Icon v-else-if="cfgSaved" name="lucide:check" class="size-4 mr-1.5" />
+            <Icon v-else name="lucide:save" class="size-4 mr-1.5" />
+            {{ cfgSaving ? 'Сохраняю…' : cfgSaved ? 'Сохранено!' : 'Сохранить' }}
+          </Button>
+          <p v-if="cfgError" class="text-sm text-destructive">{{ cfgError }}</p>
+        </div>
+      </template>
     </div>
 
+    <!-- Sources -->
     <div class="space-y-3">
-      <p class="text-sm font-medium">Источники вакансий</p>
+      <p class="text-sm font-medium flex items-center gap-2">
+        <Icon name="lucide:radio" class="size-4 text-muted-foreground" /> Источники вакансий
+      </p>
 
-      <div v-if="loading" class="space-y-2">
-        <div v-for="i in 3" :key="i" class="h-20 rounded-xl border bg-muted/20 animate-pulse" />
+      <div v-if="srcLoading" class="space-y-2">
+        <div v-for="i in 3" :key="i" class="h-20 surface bg-muted/20 animate-pulse" />
       </div>
 
       <div v-else class="space-y-2">
-        <div
-          v-for="src in sources"
-          :key="src.source_id"
-          class="surface p-4"
-        >
+        <div v-for="src in sources" :key="src.source_id" class="surface p-4">
           <div class="flex items-center gap-3 mb-3">
-            <Icon
-              :name="sourceIcons[src.source_id]?.icon ?? 'lucide:globe'"
-              :class="['size-5 shrink-0', sourceIcons[src.source_id]?.color ?? 'text-muted-foreground']"
-            />
+            <Icon :name="sourceMeta[src.source_id]?.icon ?? 'lucide:globe'"
+              :class="['size-5 shrink-0', sourceMeta[src.source_id]?.color ?? 'text-muted-foreground']" />
             <div class="flex-1 min-w-0">
               <p class="font-medium text-sm">{{ src.label }}</p>
-              <p class="text-xs text-muted-foreground">{{ sourceIcons[src.source_id]?.description }}</p>
+              <p class="text-xs text-muted-foreground">{{ sourceMeta[src.source_id]?.description }}</p>
+            </div>
+            <div class="text-right shrink-0">
+              <p class="text-[11px] text-muted-foreground uppercase tracking-wide">Последний импорт</p>
+              <p class="text-xs font-medium tabular-nums">{{ relTime(lastImport[src.source_id]) }}</p>
             </div>
           </div>
 
-          <div class="flex gap-6">
+          <div class="flex flex-wrap gap-x-6 gap-y-2">
             <button
-              :disabled="saving[`${src.source_id}_site_enabled`]"
+              v-for="f in (['site_enabled','telegram_enabled'] as const)"
+              :key="f"
+              :disabled="saving[`${src.source_id}_${f}`]"
               class="flex items-center gap-2 text-xs cursor-pointer select-none disabled:opacity-50"
-              @click="toggle(src, 'site_enabled')"
+              @click="toggle(src, f)"
             >
-              <span
-                :class="[
-                  'relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors',
-                  src.site_enabled ? 'bg-primary' : 'bg-input',
-                ]"
-              >
-                <span
-                  :class="[
-                    'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
-                    src.site_enabled ? 'translate-x-4' : 'translate-x-0',
-                  ]"
-                />
+              <span :class="['relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors',
+                src[f] ? 'bg-primary' : 'bg-input']">
+                <span :class="['inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
+                  src[f] ? 'translate-x-4' : 'translate-x-0']" />
               </span>
-              <span class="text-muted-foreground">Список на сайте</span>
-            </button>
-
-            <button
-              :disabled="saving[`${src.source_id}_telegram_enabled`]"
-              class="flex items-center gap-2 text-xs cursor-pointer select-none disabled:opacity-50"
-              @click="toggle(src, 'telegram_enabled')"
-            >
-              <span
-                :class="[
-                  'relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors',
-                  src.telegram_enabled ? 'bg-primary' : 'bg-input',
-                ]"
-              >
-                <span
-                  :class="[
-                    'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
-                    src.telegram_enabled ? 'translate-x-4' : 'translate-x-0',
-                  ]"
-                />
-              </span>
-              <span class="text-muted-foreground">Telegram уведомления</span>
+              <span class="text-muted-foreground">{{ f === 'site_enabled' ? 'Список на сайте' : 'Telegram' }}</span>
             </button>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- Connections -->
     <div class="surface p-5 space-y-3">
-      <p class="text-sm font-medium">Webhook endpoint</p>
-      <p class="text-xs text-muted-foreground">n8n отправляет вакансии на этот URL:</p>
-      <code class="block rounded-md bg-muted px-3 py-2 text-xs font-mono break-all">
-        POST https://credorevolution.space/api/webhook/jobs
-      </code>
-      <p class="text-xs text-muted-foreground">Header: <code class="bg-muted px-1 rounded">x-webhook-secret: autohq-webhook-2026</code></p>
+      <p class="text-sm font-medium flex items-center gap-2">
+        <Icon name="lucide:plug" class="size-4 text-muted-foreground" /> Интеграции
+      </p>
+      <div class="space-y-2.5">
+        <div v-for="it in integrations" :key="it.label" class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="size-2 rounded-full bg-emerald-400" />
+            <div>
+              <p class="text-sm font-medium">{{ it.label }}</p>
+              <p class="text-xs text-muted-foreground">{{ it.sub }}</p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" as-child>
+            <a :href="it.href" target="_blank" rel="noopener">Открыть</a>
+          </Button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Webhook (reference, collapsed) -->
+    <div class="surface p-5">
+      <button class="flex w-full items-center justify-between" @click="webhookOpen = !webhookOpen">
+        <span class="text-sm font-medium flex items-center gap-2">
+          <Icon name="lucide:webhook" class="size-4 text-muted-foreground" /> Webhook endpoint
+        </span>
+        <Icon :name="webhookOpen ? 'lucide:chevron-up' : 'lucide:chevron-down'" class="size-4 text-muted-foreground" />
+      </button>
+      <div v-if="webhookOpen" class="mt-4 space-y-3">
+        <div class="flex gap-2">
+          <code class="flex-1 rounded-md bg-muted px-3 py-2 text-xs font-mono break-all">POST https://credorevolution.space/api/webhook/jobs</code>
+          <Button variant="outline" size="sm" @click="copy('https://credorevolution.space/api/webhook/jobs', 'url')">
+            <Icon :name="copied === 'url' ? 'lucide:check' : 'lucide:copy'" class="size-4" />
+          </Button>
+        </div>
+        <div class="flex gap-2">
+          <code class="flex-1 rounded-md bg-muted px-3 py-2 text-xs font-mono break-all">x-webhook-secret: autohq-webhook-2026</code>
+          <Button variant="outline" size="sm" @click="copy('x-webhook-secret: autohq-webhook-2026', 'secret')">
+            <Icon :name="copied === 'secret' ? 'lucide:check' : 'lucide:copy'" class="size-4" />
+          </Button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
