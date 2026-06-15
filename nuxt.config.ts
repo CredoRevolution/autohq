@@ -25,6 +25,9 @@ export default defineNuxtConfig({
   },
 
   supabase: {
+    // В dev отключаем авто-редирект на /login, чтобы можно было работать
+    // локально без GitHub-логина (GitHub возвращает на прод). В прод-сборке — включён.
+    redirect: process.env.NODE_ENV !== 'development',
     redirectOptions: {
       login: '/login',
       callback: '/confirm',

@@ -100,11 +100,26 @@ const board = computed(() => {
 
 async function fetchJobs() {
   loading.value = true
-  const { data } = await supabase
-    .from('jobs')
-    .select('id, title, company, location, remote, status, fit_score, created_at, applied_at, url, source')
-    .order('created_at', { ascending: false })
-  jobs.value = (data as Job[]) ?? []
+
+  // DEV ONLY: локально логина нет → RLS отдаёт пусто. Подкидываем образцы,
+  // чтобы UI было видно. В прод-сборке этот блок вырезается (import.meta.dev).
+  if (import.meta.dev && jobs.value.length === 0) {
+    const now = Date.now()
+    const ago = (ms: number) => new Date(now - ms).toISOString()
+    jobs.value = [
+      { id: 'dev-1', title: 'Senior Vue Developer', company: 'Acme', location: 'Remote', remote: true, status: 'new', fit_score: 88, created_at: ago(20_000), applied_at: null, url: '#', source: 'hh' },
+      { id: 'dev-2', title: 'Frontend Engineer (Nuxt)', company: 'Globex', location: 'Berlin', remote: true, status: 'reviewing', fit_score: 74, created_at: ago(5 * 60_000), applied_at: null, url: '#', source: 'remotive' },
+      { id: 'dev-3', title: 'TypeScript Developer', company: 'Initech', location: 'Remote', remote: true, status: 'applied', fit_score: 61, created_at: ago(3 * 3_600_000), applied_at: ago(60_000), url: '#', source: 'djinni' },
+      { id: 'dev-4', title: 'Vue.js Engineer', company: 'Umbrella', location: 'Москва', remote: true, status: 'new', fit_score: 45, created_at: ago(2 * 86_400_000), applied_at: null, url: '#', source: 'habr' },
+      { id: 'dev-5', title: 'Full-Stack Developer', company: 'Hooli', location: 'Remote', remote: true, status: 'interviewing', fit_score: 92, created_at: ago(10 * 86_400_000), applied_at: ago(86_400_000), url: '#', source: 'arbeitnow' },
+    ]
+  } else {
+    const { data } = await supabase
+        .from('jobs')
+        .select('id, title, company, location, remote, status, fit_score, created_at, applied_at, url, source')
+        .order('created_at', { ascending: false })
+    jobs.value = (data as Job[]) ?? []
+  }
   loading.value = false
 }
 
@@ -214,6 +229,20 @@ async function onDrop(status: JobStatus) {
   }
   const { error } = await supabase.from('jobs').update(patch).eq('id', id)
   if (error) job.status = prev // rollback
+}
+
+function formatTimeRelative(jobCreateTime: string): string {
+  if(!jobCreateTime) return 'unknown'
+  const sAgo = (Date.now() - Date.parse(jobCreateTime) ) / 1000
+  if (sAgo < 60) return 'just now'
+  if (sAgo < 3600) return `${Math.floor(sAgo / 60)} min ago`
+  if (sAgo < 86400) return `${Math.floor(sAgo / 3600)} h ago`
+  if (sAgo < 604800) return `${Math.floor(sAgo / 86400)} d ago`
+  return new Date(Date.parse(jobCreateTime)).toLocaleString('en-US', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
 }
 
 onMounted(fetchJobs)
@@ -488,8 +517,8 @@ onMounted(fetchJobs)
                 {{ job.fit_score != null ? job.fit_score + '%' : '—' }}
               </span>
             </td>
-            <td class="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell">
-              {{ new Date(job.created_at).toLocaleDateString() }}
+            <td class="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell" :title="job.created_at">
+              {{ formatTimeRelative(job.created_at) }}
             </td>
             <td class="px-3 py-3" @click.stop>
               <button
