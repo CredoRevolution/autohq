@@ -230,10 +230,11 @@ async function onDrop(status: JobStatus) {
   const { error } = await supabase.from('jobs').update(patch).eq('id', id)
   if (error) job.status = prev // rollback
 }
+const now = ref(Date.now())
 
 function formatTimeRelative(jobCreateTime: string): string {
   if(!jobCreateTime) return 'unknown'
-  const sAgo = (Date.now() - Date.parse(jobCreateTime) ) / 1000
+  const sAgo = (now.value - Date.parse(jobCreateTime) ) / 1000
   if (sAgo < 60) return 'just now'
   if (sAgo < 3600) return `${Math.floor(sAgo / 60)} min ago`
   if (sAgo < 86400) return `${Math.floor(sAgo / 3600)} h ago`
@@ -245,7 +246,22 @@ function formatTimeRelative(jobCreateTime: string): string {
   });
 }
 
-onMounted(fetchJobs)
+let refreshJobAddedTimer: ReturnType<typeof setInterval>
+
+function refreshJobAddedTime(){
+  refreshJobAddedTimer = setInterval( () => {
+    now.value = Date.now()
+  }, 20000)
+}
+
+
+onMounted(()=>{
+  fetchJobs()
+  refreshJobAddedTime()
+})
+onBeforeUnmount(() => {
+  clearInterval(refreshJobAddedTimer)
+})
 </script>
 
 <template>
