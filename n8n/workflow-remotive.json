@@ -60,7 +60,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-webhook-secret", "value": "autohq-webhook-2026" },
+            { "name": "x-webhook-secret", "value": "__SET_YOUR_WEBHOOK_SECRET__" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },

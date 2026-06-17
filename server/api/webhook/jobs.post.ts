@@ -1,9 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
 export default defineEventHandler(async (event) => {
-  const secret = process.env.WEBHOOK_SECRET
-    || process.env.NUXT_WEBHOOK_SECRET
-    || 'autohq-webhook-2026'
+  const secret = process.env.WEBHOOK_SECRET || process.env.NUXT_WEBHOOK_SECRET
+  if (!secret) {
+    throw createError({ statusCode: 500, message: 'WEBHOOK_SECRET is not configured' })
+  }
 
   const authHeader = getHeader(event, 'x-webhook-secret')
   if (authHeader !== secret) {
