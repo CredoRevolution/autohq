@@ -35,9 +35,10 @@ It's built as two halves that talk over a single webhook:
    copy the generated cover letter, track applications, and tune the whole engine (keywords, score
    threshold, which sources are active) live — changes are picked up by n8n on the next run.
 
-> **Note** — this started as a personal tool for one job seeker, so the auth is single-user (GitHub
-> OAuth, owner only) and RLS is wide-open for authenticated users. If you fork it for a team, tighten
-> the policies first (see [Security notes](#security-notes)).
+> **Note** — this is a personal tool for one job seeker. Sign-in is GitHub OAuth, and since any
+> GitHub account can complete OAuth, an owner-gate (`OWNER_GITHUB` env + `supabase/owner_lock.sql`)
+> restricts both the app and the database to a single owner. If you fork it for a team, replace the
+> owner-gate with per-user scoping (see [Security notes](#security-notes)).
 
 ---
 
@@ -172,8 +173,9 @@ supabase/rls_policies.sql     -- Row Level Security for the jobs table
 1. GitHub → **Settings → Developer settings → OAuth Apps → New OAuth App**.
 2. **Authorization callback URL**: `https://<your-supabase-ref>.supabase.co/auth/v1/callback`.
 3. In Supabase → **Authentication → Providers → GitHub**, paste the Client ID and Secret, enable it.
-4. *(single-user lock)* The app is intended for one owner — restrict sign-ups in Supabase Auth
-   settings or check the user id in middleware if you want to be strict.
+4. *(single-user lock)* Any GitHub account can complete OAuth, so set `OWNER_GITHUB` to your
+   GitHub login (the app-level owner-gate) **and** run `supabase/owner_lock.sql` (the DB-level
+   lock). Both compare against `user_metadata.user_name` from the GitHub provider.
 
 ### 4. Environment variables
 
@@ -187,6 +189,11 @@ cp .env.example .env
 # ── Public (browser-safe) ──────────────────────────────
 NUXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NUXT_PUBLIC_SUPABASE_KEY=your-anon-key
+
+# GitHub login of the single owner. ANY GitHub account can pass OAuth,
+# so the owner-gate signs out anyone whose login != this value.
+# Leave empty to disable the gate (local dev). REQUIRED in production.
+OWNER_GITHUB=your-github-username
 
 # ── Server-only ────────────────────────────────────────
 # Shared secret n8n must send in the `x-webhook-secret` header
@@ -290,8 +297,10 @@ which statuses count as "applied", score-to-color thresholds), so the whole UI s
 This was built as a **single-user personal tool**, so a few things are deliberately loose — review
 before exposing it more widely:
 
-- **RLS is wide open** for authenticated users (`using (true)`), and `app_config` / `source_settings`
-  allow all. Fine for one owner; tighten for multi-user.
+- **Access is owner-gated, not multi-tenant.** Any GitHub account can pass OAuth, so access is locked
+  to a single owner in two layers: the app middleware (`OWNER_GITHUB`) and RLS (`supabase/owner_lock.sql`,
+  which checks the GitHub login in the JWT). There is no per-user data isolation — for a team you'd
+  replace this with `user_id`-scoped rows and RLS on `auth.uid()`.
 - **The webhook auth is a single shared secret** (`x-webhook-secret`). Keep `WEBHOOK_SECRET` long and
   private; rotate if leaked.
 - **Never commit real keys.** `.env` is gitignored. Keep OpenAI / n8n / Telegram secrets in n8n

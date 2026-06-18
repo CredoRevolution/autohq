@@ -38,6 +38,11 @@ export default defineNuxtConfig({
   runtimeConfig: {
     webhookSecret: process.env.WEBHOOK_SECRET ?? '',
     supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY ?? '',
+    public: {
+      // GitHub-логин единственного владельца. Любой другой GitHub-аккаунт,
+      // прошедший OAuth, будет разлогинен owner-гейтом. Пусто = гейт выключен.
+      ownerGithub: process.env.OWNER_GITHUB ?? '',
+    },
   },
 
   typescript: {

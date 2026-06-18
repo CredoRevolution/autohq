@@ -3,8 +3,12 @@ definePageMeta({ layout: 'auth' })
 useHead({ title: 'Sign in' })
 
 const supabase = useSupabaseClient()
+const route = useRoute()
 const loading = ref(false)
 const error = ref('')
+
+// owner-гейт выкинул чужой GitHub-аккаунт
+const denied = computed(() => route.query.denied === '1')
 
 async function signInWithGitHub() {
   loading.value = true
@@ -82,6 +86,9 @@ const stack = ['Nuxt 4', 'Supabase', 'n8n', 'OpenAI', 'Vercel']
           {{ loading ? 'Redirecting…' : 'Sign in with GitHub' }}
         </button>
         <p v-if="error" class="text-xs text-destructive text-center">{{ error }}</p>
+        <p v-if="denied" class="text-xs text-destructive text-center">
+          This account isn't authorized. Personal tool — owner access only.
+        </p>
         <p class="text-xs text-muted-foreground text-center">
           Personal tool — access is limited to the owner.
         </p>
