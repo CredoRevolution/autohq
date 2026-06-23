@@ -231,10 +231,15 @@ The repo is Vercel-ready ([`vercel.json`](vercel.json)):
 
 The [`n8n/`](n8n/) folder contains starter workflow exports and helper scripts.
 
-1. **Import a base workflow** — in n8n, *Import from File* → [`n8n/workflow-remotive.json`](n8n/workflow-remotive.json),
-   [`n8n/workflow-hh.json`](n8n/workflow-hh.json) or [`n8n/workflow-rabota.json`](n8n/workflow-rabota.json)
-   (rabota.by shares HH's HeadHunter API — same mapping, just `host`/`area` differ). Each one fetches
-   postings, maps them to the AutoHQ format, and POSTs to your webhook.
+1. **Import a base workflow** — in n8n, *Import from File* → [`n8n/workflow-remotive.json`](n8n/workflow-remotive.json)
+   or [`n8n/workflow-hh.json`](n8n/workflow-hh.json). Each one fetches postings, maps them to the
+   AutoHQ format, and POSTs to your webhook.
+
+   > **HH.ru & rabota.by note:** the public HeadHunter API (`api.hh.ru` / `api.rabota.by`) now returns
+   > `403 forbidden` to unauthorized clients, so both are collected via an **Apify** actor
+   > (`shahidirfan/hh-ru-Job-Scraper`) instead. rabota.by is the same scraper pointed at a
+   > `startUrl=https://rabota.by/search/vacancy?text=…&area=16` (area 16 = Belarus) — clone the
+   > `HH.ru via Apify` workflow and swap the actor input + `source` tag.
 2. **Point it at your app** — set the HTTP Request node URL to your `/api/webhook/jobs` and add the
    header `x-webhook-secret: <WEBHOOK_SECRET>`.
 3. **Add the AI layer** — in the n8n editor, drop in an OpenAI (HTTP Request / OpenAI node) step after
