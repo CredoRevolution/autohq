@@ -36,6 +36,10 @@ const RULES = {
     fetch: 'Search HH Vacancies',
     apply: f => setQuery(f, 'text', "={{ $json.keywords.split(' ').join(' OR ') }}"),
   },
+  'AutoHQ - rabota.by Jobs': {
+    fetch: 'Search rabota.by Vacancies',
+    apply: f => setQuery(f, 'text', "={{ $json.keywords.split(' ').join(' OR ') }}"),
+  },
   'AutoHQ - HH.ru via Apify': {
     fetch: 'Fetch HH.ru via Apify',
     apply: f => setBody(f, "={{ JSON.stringify({ text: $json.keywords.split(' ').join(' OR '), schedule: 'remote' }) }}"),

@@ -12,5 +12,6 @@ create policy "allow all" on source_settings for all using (true) with check (tr
 insert into source_settings (source_id, label, site_enabled, telegram_enabled) values
   ('remotive', 'Remotive.com', true, true),
   ('arbeitnow', 'Arbeitnow', true, true),
-  ('hh', 'HH.ru', false, false)
+  ('hh', 'HH.ru', false, false),
+  ('rabota', 'rabota.by', true, false)
 on conflict (source_id) do nothing;
