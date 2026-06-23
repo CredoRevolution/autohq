@@ -1,0 +1,115 @@
+{
+  "name": "AutoHQ - rabota.by Jobs",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Every weekday 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300],
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 8 * * 1-5" }] }
+      }
+    },
+    {
+      "id": "get-config-rabota",
+      "name": "Get Config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [350, 160],
+      "parameters": { "url": "https://credorevolution.space/api/config", "options": {} }
+    },
+    {
+      "id": "n3",
+      "name": "Search rabota.by Vacancies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "url": "https://api.rabota.by/vacancies",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "text", "value": "={{ $json.keywords.split(' ').join(' OR ') }}" },
+            { "name": "area", "value": "16" },
+            { "name": "per_page", "value": "50" },
+            { "name": "order_by", "value": "publication_time" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "HH-User-Agent", "value": "AutoHQ/1.0 (nikita1997miki@gmail.com)" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Split Items",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "parameters": { "fieldToSplitOut": "items", "options": {} }
+    },
+    {
+      "id": "n5",
+      "name": "Map Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "parameters": {
+        "jsCode": "const item = $input.item.json;\nconst s = item.salary || {};\nlet mn = s.from || null, mx = s.to || null;\n// rough FX to USD; rabota.by salaries are usually BYN (legacy code BYR)\nconst rate = { RUR: 90, BYR: 3.3, BYN: 3.3 }[s.currency];\nif (rate) { if (mn) mn = Math.round(mn / rate); if (mx) mx = Math.round(mx / rate); }\nconst isRemote = (item.schedule || {}).id === \"remote\";\nreturn {\n  title: item.name,\n  company: (item.employer || {}).name || \"Unknown\",\n  url: item.alternate_url || null,\n  location: (item.area || {}).name || null,\n  remote: isRemote,\n  status: \"new\",\n  salary_min: mn,\n  salary_max: mx,\n  source: \"rabota\",\n  notes: \"Source: rabota.by | ID: \" + item.id\n};"
+      }
+    },
+    {
+      "id": "n6",
+      "name": "Send to AutoHQ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://credorevolution.space/api/webhook/jobs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-webhook-secret", "value": "__SET_YOUR_WEBHOOK_SECRET__" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "n7",
+      "name": "Telegram Notify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot__SET_YOUR_BOT_TOKEN__/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: __SET_YOUR_CHAT_ID__, text: '✅ rabota.by: ' + $json.title + ' @ ' + $json.company + ($json.url ? '\\n' + $json.url : ''), parse_mode: 'HTML' }) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Every weekday 8am": { "main": [[{ "node": "Get Config", "type": "main", "index": 0 }]] },
+    "Get Config": { "main": [[{ "node": "Search rabota.by Vacancies", "type": "main", "index": 0 }]] },
+    "Search rabota.by Vacancies": { "main": [[{ "node": "Split Items", "type": "main", "index": 0 }]] },
+    "Split Items": { "main": [[{ "node": "Map Fields", "type": "main", "index": 0 }]] },
+    "Map Fields": { "main": [[{ "node": "Send to AutoHQ", "type": "main", "index": 0 }]] },
+    "Send to AutoHQ": { "main": [[{ "node": "Telegram Notify", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["autohq"]
+}

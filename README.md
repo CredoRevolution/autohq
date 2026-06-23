@@ -49,7 +49,7 @@ It's built as two halves that talk over a single webhook:
 | 🤖 **AI scoring** | Every posting rated **1–100** against your profile; only relevant jobs surface to the top. |
 | ✍️ **Auto cover letters** | OpenAI writes a tailored, language-aware (EN/RU) cover letter per job — no clichés, references your real projects. |
 | 📲 **Telegram alerts** | Get pinged *only* for jobs scoring above your threshold (default ≥ 70). No noise. |
-| 🔌 **Multiple sources** | Remotive, Arbeitnow, HH.ru, Djinni out of the box — each its own n8n workflow, toggleable from the UI. |
+| 🔌 **Multiple sources** | Remotive, Arbeitnow, HH.ru, rabota.by (Belarus), Djinni out of the box — each its own n8n workflow, toggleable from the UI. |
 | 📊 **Pipeline dashboard** | Stats, a funnel view, top matches, and a Kanban board from *new* to *offer*. |
 | 📄 **Live resume** | Your resume is rendered straight from a Markdown file in a GitHub repo (e.g. an Obsidian vault) — single source of truth. |
 | 🎛️ **Live control panel** | Change search keywords, score threshold, and enable/disable sources without redeploying — n8n reads these at runtime. |
@@ -62,7 +62,7 @@ It's built as two halves that talk over a single webhook:
 ```
                           ┌──────────────────────────────────────────┐
                           │                  n8n                       │
-   ⏰ weekday cron  ─────▶ │  Fetch (Remotive / Arbeitnow / HH / Djinni)│
+   ⏰ weekday cron  ─────▶ │ Fetch (Remotive/Arbeitnow/HH/rabota.by/Djinni)│
                           │            │                               │
                           │            ▼                               │
                           │   OpenAI: score 1–100 + cover letter       │
@@ -153,7 +153,7 @@ create table if not exists jobs (
   description   text,
   cover_letter  text,
   score_reason  text,
-  source        text,                        -- remotive | arbeitnow | hh | djinni
+  source        text,                        -- remotive | arbeitnow | hh | rabota | djinni
   created_at    timestamptz default now()
 );
 ```
@@ -163,7 +163,7 @@ Then run the migration files in [`supabase/`](supabase/) (order doesn't matter m
 ```
 supabase/ai_fields.sql        -- description / cover_letter / score_reason + dedupe-by-URL index
 supabase/app_config.sql       -- live tunables: keywords + telegram_min_score (single row)
-supabase/source_settings.sql  -- per-source on/off toggles (remotive, arbeitnow, hh, djinni)
+supabase/source_settings.sql  -- per-source on/off toggles (remotive, arbeitnow, hh, rabota, djinni)
 supabase/profile.sql          -- candidate profile (single row)
 supabase/rls_policies.sql     -- Row Level Security for the jobs table
 ```
@@ -231,9 +231,10 @@ The repo is Vercel-ready ([`vercel.json`](vercel.json)):
 
 The [`n8n/`](n8n/) folder contains starter workflow exports and helper scripts.
 
-1. **Import a base workflow** — in n8n, *Import from File* → [`n8n/workflow-remotive.json`](n8n/workflow-remotive.json)
-   or [`n8n/workflow-hh.json`](n8n/workflow-hh.json). Each one fetches postings, maps them to the
-   AutoHQ format, and POSTs to your webhook.
+1. **Import a base workflow** — in n8n, *Import from File* → [`n8n/workflow-remotive.json`](n8n/workflow-remotive.json),
+   [`n8n/workflow-hh.json`](n8n/workflow-hh.json) or [`n8n/workflow-rabota.json`](n8n/workflow-rabota.json)
+   (rabota.by shares HH's HeadHunter API — same mapping, just `host`/`area` differ). Each one fetches
+   postings, maps them to the AutoHQ format, and POSTs to your webhook.
 2. **Point it at your app** — set the HTTP Request node URL to your `/api/webhook/jobs` and add the
    header `x-webhook-secret: <WEBHOOK_SECRET>`.
 3. **Add the AI layer** — in the n8n editor, drop in an OpenAI (HTTP Request / OpenAI node) step after
