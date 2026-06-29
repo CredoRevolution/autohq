@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '~/components/ui/dialog'
 import { JOB_STATUS, PIPELINE, BOARD_COLUMNS, scoreColor, type JobStatus } from '~/composables/useJobStatus'
+import { sourceLabel } from '~/composables/useJobSource'
 import JobPeek from '~/components/app/JobPeek.vue'
 
 definePageMeta({ layout: 'default' })
@@ -38,20 +39,6 @@ const sourceFilter = ref<Set<string>>(new Set())
 const sortBy = ref<'score' | 'date'>('score')
 const jobs = ref<Job[]>([])
 const loading = ref(true)
-
-const SOURCE_LABELS: Record<string, string> = {
-  remotive: 'Remotive',
-  arbeitnow: 'Arbeitnow',
-  habr: 'Habr Career',
-  hh: 'HH.ru',
-  djinni: 'Djinni',
-  linkedin: 'LinkedIn',
-  unknown: 'Other',
-}
-function sourceLabel(s: string | null): string {
-  if (!s) return 'Other'
-  return SOURCE_LABELS[s] ?? s
-}
 
 /** distinct sources present in the data, with counts, most common first */
 const sources = computed(() => {

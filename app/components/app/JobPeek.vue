@@ -2,6 +2,7 @@
 import { Button } from '~/components/ui/button'
 import { Sheet, SheetContent } from '~/components/ui/sheet'
 import { JOB_STATUS, PIPELINE, scoreColor, type JobStatus } from '~/composables/useJobStatus'
+import { sourceLabel } from '~/composables/useJobSource'
 
 /** The summary the board already has in memory — shown instantly on open. */
 interface JobSummary {
@@ -96,14 +97,6 @@ async function del() {
   emit('update:open', false)
 }
 
-const SOURCE_LABELS: Record<string, string> = {
-  remotive: 'Remotive', arbeitnow: 'Arbeitnow', habr: 'Habr Career',
-  hh: 'HH.ru', djinni: 'Djinni', linkedin: 'LinkedIn', unknown: 'Other',
-}
-function sourceLabel(s: string | null): string {
-  if (!s) return 'Other'
-  return SOURCE_LABELS[s] ?? s
-}
 </script>
 
 <template>
